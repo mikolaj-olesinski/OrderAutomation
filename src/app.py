@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from chrome_manager import ChromeManager
-from order_extractor import OrderExtractor
+from extractors import OrderCoordinator, B2BExtractor
 
 app = Flask(__name__)
 
@@ -56,14 +56,13 @@ def extract_order():
         config = load_config()
         port = config.get('chrome_debug_port', 9222)
         
-        logger.info(f"Creating OrderExtractor with port {port}")
-        extractor = OrderExtractor(chrome_debug_port=port)
+        logger.info(f"Creating OrderCoordinator with port {port}")
+        coordinator = OrderCoordinator(chrome_debug_port=port)
         
         logger.info("Calling extract_all_order_data()")
-        order_data = extractor.extract_all_order_data()
+        order_data = coordinator.extract_all_order_data()
         
         logger.info(f"Extraction complete, success={order_data.get('success')}")
-        extractor.close()
         
         return jsonify(order_data)
     except Exception as e:
@@ -93,8 +92,6 @@ def save_config():
         logger.error(f"Failed to save config: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-
-
 @app.route('/api/open-import-modal', methods=['POST'])
 def open_import_modal():
     """Open the import products modal on B2B Hendi"""
@@ -103,7 +100,7 @@ def open_import_modal():
         config = load_config()
         port = config.get('chrome_debug_port', 9222)
         
-        extractor = OrderExtractor(chrome_debug_port=port)
+        extractor = B2BExtractor(chrome_debug_port=port)
         
         # Connect to Chrome
         if not extractor.connect_to_chrome():
@@ -141,8 +138,6 @@ def open_import_modal():
             "success": False,
             "error": str(e)
         }), 500
-    
-
 
 @app.route('/api/import-products', methods=['POST'])
 def import_products():
@@ -163,54 +158,14 @@ def import_products():
         config = load_config()
         port = config.get('chrome_debug_port', 9222)
         
-        extractor = OrderExtractor(chrome_debug_port=port)
+        # Use OrderCoordinator for simplified import
+        coordinator = OrderCoordinator(chrome_debug_port=port)
+        result = coordinator.import_products_to_b2b(products)
         
-        # Connect to Chrome
-        if not extractor.connect_to_chrome():
-            return jsonify({
-                "success": False,
-                "error": "Could not connect to Chrome"
-            }), 500
-        
-        # Switch to B2B Hendi tab
-        if not extractor.find_b2b_hendi_tab():
-            extractor.close()
-            return jsonify({
-                "success": False,
-                "error": "B2B Hendi tab not found"
-            }), 404
-        
-        # Open import modal
-        if not extractor.click_import_products_button():
-            extractor.close()
-            return jsonify({
-                "success": False,
-                "error": "Failed to open import modal"
-            }), 500
-        
-        # Create CSV
-        csv_path = extractor.create_csv_from_products(products)
-        if not csv_path:
-            extractor.close()
-            return jsonify({
-                "success": False,
-                "error": "Failed to create CSV file"
-            }), 500
-        
-        # Upload CSV
-        if not extractor.upload_csv_to_modal(csv_path):
-            extractor.close()
-            return jsonify({
-                "success": False,
-                "error": "Failed to upload CSV"
-            }), 500
-        
-        extractor.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Products imported successfully"
-        })
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
             
     except Exception as e:
         logger.error(f"Error importing products: {e}", exc_info=True)
@@ -218,7 +173,62 @@ def import_products():
             "success": False,
             "error": str(e)
         }), 500
-    
+
+@app.route('/api/complete-order', methods=['POST'])
+def complete_order():
+    """Complete order: import products and fill delivery address"""
+    try:
+        logger.info("Complete order endpoint called")
+        
+        # Get data from request
+        data = request.json
+        products = data.get('products', [])
+        address = data.get('address', {})
+        payment_amount = data.get('payment_amount', None)
+        
+        if not products:
+            return jsonify({
+                "success": False,
+                "error": "No products provided"
+            }), 400
+        
+        if not address:
+            return jsonify({
+                "success": False,
+                "error": "No address data provided"
+            }), 400
+        
+        # Prepare address data for B2B format
+        # Use full address in street field, dot in building number
+        address_data = {
+            'name': address.get('company', ''),
+            'phone': address.get('phone', ''),
+            'email': data.get('email', ''),
+            'street': address.get('address', ''),  # Full address in street
+            'street_no': '.',  # Dot as building number
+            'street_flat': '',  # Optional
+            'zip': address.get('postal_code', ''),
+            'city': address.get('city', '')
+        }
+        
+        config = load_config()
+        port = config.get('chrome_debug_port', 9222)
+        
+        # Use OrderCoordinator for complete order
+        coordinator = OrderCoordinator(chrome_debug_port=port)
+        result = coordinator.complete_order_with_address(products, address_data, payment_amount)
+        
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Error completing order: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

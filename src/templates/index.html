@@ -560,7 +560,7 @@
 
         // Import to B2B
         document.getElementById('import-to-b2b-btn').addEventListener('click', async () => {
-            // Collect products
+            // Zbierz produkty
             const products = [];
             document.querySelectorAll('#products-tbody tr').forEach(row => {
                 const sku = row.querySelector('.product-sku').value;
@@ -575,28 +575,48 @@
                 return;
             }
 
-            addLog(`INFO: Importing ${products.length} products to B2B Hendi...`);
+            // Zbierz adres
+            const address = {
+                company: document.getElementById('order-company').value,
+                phone: document.getElementById('order-phone').value,
+                address: document.getElementById('order-address').value,
+                city: document.getElementById('order-city').value,
+                postal_code: document.getElementById('order-postal-code').value
+            };
+
+            const email = document.getElementById('order-email').value;
+            const payment_amount = document.getElementById('order-payment').value; // Dodane!
+
+            // Walidacja - sprawdź czy wszystkie pola są wypełnione
+            if (!address.company || !address.phone || !email || !address.address || !address.city || !address.postal_code) {
+                addLog('ERROR: Please fill all address fields');
+                return;
+            }
+
+            addLog(`INFO: Completing full order with ${products.length} products...`);
             
             try {
-                const response = await fetch('/api/import-products', {
+                const response = await fetch('/api/complete-order', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ products: products })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        products: products,
+                        address: address,
+                        email: email,
+                        payment_amount: payment_amount  // Dodane!
+                    })
                 });
+                
                 const result = await response.json();
-
                 if (result.success) {
                     addLog('SUCCESS: ' + result.message);
                 } else {
-                    addLog('ERROR: ' + (result.error || 'Failed to import products'));
+                    addLog('ERROR: ' + (result.error || 'Failed to complete order'));
                 }
             } catch (error) {
-                addLog('ERROR: Failed to import products');
+                addLog('ERROR: Failed to complete order - ' + error.message);
             }
         });
-
         // Auto-refresh status every 5 seconds
         statusInterval = setInterval(updateStatus, 5000);
 
