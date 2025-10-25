@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Automation Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .status-card {
+            transition: all 0.3s;
+        }
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .status-ok {
+            background-color: #28a745;
+        }
+        .status-error {
+            background-color: #dc3545;
+        }
+        .log-container {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">
+            <i class="bi bi-gear-fill"></i> Order Automation Manager
+        </h1>
+
+        <!-- Status Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card status-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-browser-chrome"></i> Chrome Status
+                        </h5>
+                        <p class="card-text">
+                            <span class="status-indicator" id="chrome-status"></span>
+                            <span id="chrome-status-text">Checking...</span>
+                        </p>
+                        <small class="text-muted" id="system-info"></small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card status-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-box"></i> BaseLinker
+                        </h5>
+                        <p class="card-text">
+                            <span class="status-indicator" id="baselinker-status"></span>
+                            <span id="baselinker-status-text">Checking...</span>
+                        </p>
+                        <small class="text-muted" id="baselinker-title"></small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card status-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-shop"></i> B2B Hendi
+                        </h5>
+                        <p class="card-text">
+                            <span class="status-indicator" id="b2b-status"></span>
+                            <span id="b2b-status-text">Checking...</span>
+                        </p>
+                        <small class="text-muted" id="b2b-title"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-play-circle"></i> Actions
+                </h5>
+                <button class="btn btn-primary btn-lg" id="launch-chrome-btn">
+                    <i class="bi bi-browser-chrome"></i> Launch Chrome
+                </button>
+                <button class="btn btn-success btn-lg" id="refresh-status-btn">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                </button>
+                <button class="btn btn-warning btn-lg" id="extract-order-btn">
+                    <i class="bi bi-download"></i> Extract Order Data
+                </button>
+                <button class="btn btn-secondary btn-lg" id="config-btn">
+                    <i class="bi bi-gear"></i> Configuration
+                </button>
+            </div>
+        </div>
+
+        <!-- Configuration Section (hidden by default) -->
+        <div class="card mb-4" id="config-section" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-gear-fill"></i> Configuration
+                </h5>
+                <form id="config-form">
+                    <div class="mb-3">
+                        <label for="chrome-path" class="form-label">Chrome Path (optional)</label>
+                        <input type="text" class="form-control" id="chrome-path" placeholder="Leave empty for auto-detect">
+                    </div>
+                    <div class="mb-3">
+                        <label for="user-data-dir" class="form-label">Chrome User Data Directory</label>
+                        <input type="text" class="form-control" id="user-data-dir" placeholder="e.g., C:/Users/username/AppData/Local/Google/Chrome/User Data/Profile 4">
+                    </div>
+                    <div class="mb-3">
+                        <label for="debug-port" class="form-label">Chrome Debug Port</label>
+                        <input type="number" class="form-control" id="debug-port" value="9222">
+                    </div>
+                    <div class="mb-3">
+                        <label for="baselinker-url" class="form-label">BaseLinker URL</label>
+                        <input type="text" class="form-control" id="baselinker-url">
+                    </div>
+                    <div class="mb-3">
+                        <label for="b2b-url" class="form-label">B2B Hendi URL</label>
+                        <input type="text" class="form-control" id="b2b-url">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save Configuration
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="cancel-config-btn">
+                        Cancel
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Order Data Section (hidden by default) -->
+        <div class="card mb-4" id="order-data-section" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-cart-check"></i> Order Data
+                    <button class="btn btn-sm btn-outline-secondary float-end" id="close-order-data-btn">
+                        <i class="bi bi-x"></i> Close
+                    </button>
+                </h5>
+
+                <!-- Products -->
+                <h6 class="mt-3">Products</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm" id="products-table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Quantity</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody">
+                            <!-- Products will be populated here -->
+                        </tbody>
+                    </table>
+                    <button class="btn btn-sm btn-success" id="add-product-btn">
+                        <i class="bi bi-plus"></i> Add Product
+                    </button>
+                </div>
+
+                <!-- Contact Information -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <h6>Contact Information</h6>
+                        <div class="mb-2">
+                            <label for="order-phone" class="form-label">Phone</label>
+                            <input type="text" class="form-control form-control-sm" id="order-phone">
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-email" class="form-label">Email</label>
+                            <input type="email" class="form-control form-control-sm" id="order-email">
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-payment" class="form-label">Payment Amount (PLN)</label>
+                            <input type="text" class="form-control form-control-sm" id="order-payment" readonly>
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-b2b-number" class="form-label">B2B Order Number</label>
+                            <input type="text" class="form-control form-control-sm" id="order-b2b-number">
+                        </div>
+                    </div>
+
+                    <!-- Address -->
+                    <div class="col-md-6">
+                        <h6>Delivery Address</h6>
+                        <div class="mb-2">
+                            <label for="order-name" class="form-label">Name</label>
+                            <input type="text" class="form-control form-control-sm" id="order-name">
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-company" class="form-label">Company</label>
+                            <input type="text" class="form-control form-control-sm" id="order-company">
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-address" class="form-label">Street Address</label>
+                            <input type="text" class="form-control form-control-sm" id="order-address">
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-city" class="form-label">City</label>
+                            <input type="text" class="form-control form-control-sm" id="order-city">
+                        </div>
+                        <div class="mb-2">
+                            <label for="order-postal-code" class="form-label">Postal Code</label>
+                            <input type="text" class="form-control form-control-sm" id="order-postal-code">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-3">
+                    <button class="btn btn-primary" id="process-order-btn">
+                        <i class="bi bi-send"></i> Process Order
+                    </button>
+                    <button class="btn btn-secondary" id="clear-order-btn">
+                        <i class="bi bi-trash"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-terminal"></i> Logs
+                </h5>
+                <div class="log-container" id="log-container">
+                    <div>Waiting for actions...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let statusInterval;
+
+        // Load configuration
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('chrome-path').value = config.chrome_path || '';
+                document.getElementById('user-data-dir').value = config.chrome_user_data_dir || '';
+                document.getElementById('debug-port').value = config.chrome_debug_port || 9222;
+                document.getElementById('baselinker-url').value = config.baselinker_url || '';
+                document.getElementById('b2b-url').value = config.b2b_hendi_url || '';
+            } catch (error) {
+                addLog('ERROR: Failed to load configuration');
+            }
+        }
+
+        // Save configuration
+        document.getElementById('config-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const config = {
+                chrome_path: document.getElementById('chrome-path').value,
+                chrome_user_data_dir: document.getElementById('user-data-dir').value,
+                chrome_debug_port: parseInt(document.getElementById('debug-port').value),
+                baselinker_url: document.getElementById('baselinker-url').value,
+                b2b_hendi_url: document.getElementById('b2b-url').value,
+                baselinker_keywords: ["baselinker", "base", "linker"],
+                b2b_keywords: ["b2b", "hendi"]
+            };
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    addLog('SUCCESS: Configuration saved');
+                    document.getElementById('config-section').style.display = 'none';
+                } else {
+                    addLog('ERROR: Failed to save configuration');
+                }
+            } catch (error) {
+                addLog('ERROR: Failed to save configuration');
+            }
+        });
+
+        // Update status
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                // Chrome status
+                const chromeStatus = document.getElementById('chrome-status');
+                const chromeText = document.getElementById('chrome-status-text');
+                if (status.chrome_running) {
+                    chromeStatus.className = 'status-indicator status-ok';
+                    chromeText.textContent = 'Running';
+                } else {
+                    chromeStatus.className = 'status-indicator status-error';
+                    chromeText.textContent = 'Not running';
+                }
+
+                document.getElementById('system-info').textContent = `System: ${status.system}`;
+
+                // BaseLinker status
+                const baselinkerStatus = document.getElementById('baselinker-status');
+                const baselinkerText = document.getElementById('baselinker-status-text');
+                if (status.baselinker_open) {
+                    baselinkerStatus.className = 'status-indicator status-ok';
+                    baselinkerText.textContent = 'Open';
+                    document.getElementById('baselinker-title').textContent = status.baselinker_title || '';
+                } else {
+                    baselinkerStatus.className = 'status-indicator status-error';
+                    baselinkerText.textContent = 'Not found';
+                    document.getElementById('baselinker-title').textContent = '';
+                }
+
+                // B2B Hendi status
+                const b2bStatus = document.getElementById('b2b-status');
+                const b2bText = document.getElementById('b2b-status-text');
+                if (status.b2b_hendi_open) {
+                    b2bStatus.className = 'status-indicator status-ok';
+                    b2bText.textContent = 'Open';
+                    document.getElementById('b2b-title').textContent = status.b2b_hendi_title || '';
+                } else {
+                    b2bStatus.className = 'status-indicator status-error';
+                    b2bText.textContent = 'Not found';
+                    document.getElementById('b2b-title').textContent = '';
+                }
+            } catch (error) {
+                addLog('ERROR: Failed to update status');
+            }
+        }
+
+        // Launch Chrome
+        document.getElementById('launch-chrome-btn').addEventListener('click', async () => {
+            addLog('INFO: Launching Chrome...');
+            
+            try {
+                const response = await fetch('/api/launch-chrome', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('SUCCESS: ' + result.message);
+                    setTimeout(updateStatus, 2000);
+                } else {
+                    addLog('ERROR: ' + result.error);
+                }
+            } catch (error) {
+                addLog('ERROR: Failed to launch Chrome');
+            }
+        });
+
+        // Refresh status
+        document.getElementById('refresh-status-btn').addEventListener('click', () => {
+            addLog('INFO: Refreshing status...');
+            updateStatus();
+        });
+
+        // Toggle configuration
+        document.getElementById('config-btn').addEventListener('click', () => {
+            const configSection = document.getElementById('config-section');
+            if (configSection.style.display === 'none') {
+                configSection.style.display = 'block';
+                loadConfig();
+            } else {
+                configSection.style.display = 'none';
+            }
+        });
+
+        document.getElementById('cancel-config-btn').addEventListener('click', () => {
+            document.getElementById('config-section').style.display = 'none';
+        });
+
+        // Add log entry
+        function addLog(message) {
+            const logContainer = document.getElementById('log-container');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Extract Order Data
+        document.getElementById('extract-order-btn').addEventListener('click', async () => {
+            addLog('INFO: Extracting order data...');
+            
+            try {
+                const response = await fetch('/api/extract-order', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    addLog('SUCCESS: Order data extracted successfully');
+                    displayOrderData(result);
+                    document.getElementById('order-data-section').style.display = 'block';
+                } else {
+                    addLog('ERROR: ' + (result.error || 'Failed to extract order data'));
+                }
+            } catch (error) {
+                addLog('ERROR: Failed to extract order data');
+            }
+        });
+
+        // Display order data in the form
+        function displayOrderData(data) {
+            // Display products
+            const tbody = document.getElementById('products-tbody');
+            tbody.innerHTML = '';
+            
+            if (data.products && data.products.length > 0) {
+                data.products.forEach(product => {
+                    addProductRow(product.sku, product.quantity);
+                });
+            }
+
+            // Display contact info
+            document.getElementById('order-phone').value = data.phone || '';
+            document.getElementById('order-email').value = data.email || '';
+            document.getElementById('order-payment').value = data.payment_amount || '';
+            document.getElementById('order-b2b-number').value = data.b2b_number || '';
+
+            // Display address
+            if (data.address) {
+                document.getElementById('order-name').value = data.address.name || '';
+                document.getElementById('order-company').value = data.address.company || '';
+                document.getElementById('order-address').value = data.address.address || '';
+                document.getElementById('order-city').value = data.address.city || '';
+                document.getElementById('order-postal-code').value = data.address.postal_code || '';
+            }
+        }
+
+        // Add product row to table
+        function addProductRow(sku = '', quantity = '') {
+            const tbody = document.getElementById('products-tbody');
+            const row = tbody.insertRow();
+            
+            row.innerHTML = `
+                <td><input type="text" class="form-control form-control-sm product-sku" value="${sku}"></td>
+                <td><input type="number" class="form-control form-control-sm product-quantity" value="${quantity}"></td>
+                <td><button class="btn btn-sm btn-danger remove-product-btn"><i class="bi bi-trash"></i></button></td>
+            `;
+
+            // Add remove button handler
+            row.querySelector('.remove-product-btn').addEventListener('click', () => {
+                row.remove();
+            });
+        }
+
+        // Add product button
+        document.getElementById('add-product-btn').addEventListener('click', () => {
+            addProductRow();
+        });
+
+        // Close order data section
+        document.getElementById('close-order-data-btn').addEventListener('click', () => {
+            document.getElementById('order-data-section').style.display = 'none';
+        });
+
+        // Clear order data
+        document.getElementById('clear-order-btn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all order data?')) {
+                document.getElementById('products-tbody').innerHTML = '';
+                document.getElementById('order-phone').value = '';
+                document.getElementById('order-email').value = '';
+                document.getElementById('order-payment').value = '';
+                document.getElementById('order-b2b-number').value = '';
+                document.getElementById('order-name').value = '';
+                document.getElementById('order-company').value = '';
+                document.getElementById('order-address').value = '';
+                document.getElementById('order-city').value = '';
+                document.getElementById('order-postal-code').value = '';
+                addLog('INFO: Order data cleared');
+            }
+        });
+
+        // Process order (placeholder for now)
+        document.getElementById('process-order-btn').addEventListener('click', () => {
+            // Collect all data
+            const products = [];
+            document.querySelectorAll('#products-tbody tr').forEach(row => {
+                const sku = row.querySelector('.product-sku').value;
+                const quantity = row.querySelector('.product-quantity').value;
+                if (sku && quantity) {
+                    products.push({ sku, quantity });
+                }
+            });
+
+            const orderData = {
+                products: products,
+                phone: document.getElementById('order-phone').value,
+                email: document.getElementById('order-email').value,
+                payment_amount: document.getElementById('order-payment').value,
+                b2b_number: document.getElementById('order-b2b-number').value,
+                address: {
+                    name: document.getElementById('order-name').value,
+                    company: document.getElementById('order-company').value,
+                    address: document.getElementById('order-address').value,
+                    city: document.getElementById('order-city').value,
+                    postal_code: document.getElementById('order-postal-code').value
+                }
+            };
+
+            addLog('INFO: Order processing functionality coming soon...');
+            console.log('Order data to process:', orderData);
+        });
+
+        // Auto-refresh status every 5 seconds
+        statusInterval = setInterval(updateStatus, 5000);
+
+        // Initial status update
+        updateStatus();
+        addLog('INFO: Application started');
+    </script>
+</body>
+</html>
