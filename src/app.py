@@ -93,5 +93,132 @@ def save_config():
         logger.error(f"Failed to save config: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+
+@app.route('/api/open-import-modal', methods=['POST'])
+def open_import_modal():
+    """Open the import products modal on B2B Hendi"""
+    try:
+        logger.info("Open import modal endpoint called")
+        config = load_config()
+        port = config.get('chrome_debug_port', 9222)
+        
+        extractor = OrderExtractor(chrome_debug_port=port)
+        
+        # Connect to Chrome
+        if not extractor.connect_to_chrome():
+            return jsonify({
+                "success": False,
+                "error": "Could not connect to Chrome"
+            }), 500
+        
+        # Switch to B2B Hendi tab
+        if not extractor.find_b2b_hendi_tab():
+            extractor.close()
+            return jsonify({
+                "success": False,
+                "error": "B2B Hendi tab not found"
+            }), 404
+        
+        # Click the import button
+        result = extractor.click_import_products_button()
+        extractor.close()
+        
+        if result:
+            return jsonify({
+                "success": True,
+                "message": "Import modal opened successfully"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to open import modal"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error opening import modal: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+    
+
+
+@app.route('/api/import-products', methods=['POST'])
+def import_products():
+    """Create CSV from products and import to B2B Hendi"""
+    try:
+        logger.info("Import products endpoint called")
+        
+        # Get products from request
+        data = request.json
+        products = data.get('products', [])
+        
+        if not products:
+            return jsonify({
+                "success": False,
+                "error": "No products provided"
+            }), 400
+        
+        config = load_config()
+        port = config.get('chrome_debug_port', 9222)
+        
+        extractor = OrderExtractor(chrome_debug_port=port)
+        
+        # Connect to Chrome
+        if not extractor.connect_to_chrome():
+            return jsonify({
+                "success": False,
+                "error": "Could not connect to Chrome"
+            }), 500
+        
+        # Switch to B2B Hendi tab
+        if not extractor.find_b2b_hendi_tab():
+            extractor.close()
+            return jsonify({
+                "success": False,
+                "error": "B2B Hendi tab not found"
+            }), 404
+        
+        # Open import modal
+        if not extractor.click_import_products_button():
+            extractor.close()
+            return jsonify({
+                "success": False,
+                "error": "Failed to open import modal"
+            }), 500
+        
+        # Create CSV
+        csv_path = extractor.create_csv_from_products(products)
+        if not csv_path:
+            extractor.close()
+            return jsonify({
+                "success": False,
+                "error": "Failed to create CSV file"
+            }), 500
+        
+        # Upload CSV
+        if not extractor.upload_csv_to_modal(csv_path):
+            extractor.close()
+            return jsonify({
+                "success": False,
+                "error": "Failed to upload CSV"
+            }), 500
+        
+        extractor.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Products imported successfully"
+        })
+            
+    except Exception as e:
+        logger.error(f"Error importing products: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+    
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -267,3 +267,95 @@ class OrderExtractor:
         if self.driver:
             # We don't quit() because we're using existing Chrome
             self.driver = None
+
+
+    def click_import_products_button(self):
+        """Click the 'Importuj produkty' button to open modal"""
+        try:
+            # Find and click the import button
+            import_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'button.jsShowModalButton[data-modal=".jsImportProductsModal"]'))
+            )
+            import_button.click()
+            logger.info("Clicked 'Importuj produkty' button")
+            
+            # Wait a bit for modal to appear
+            time.sleep(1)
+            
+            # Check if modal appeared
+            try:
+                modal = self.driver.find_element(By.CLASS_NAME, 'jsImportProductsModal')
+                if modal.is_displayed():
+                    logger.info("Import modal opened successfully")
+                    return True
+                else:
+                    logger.warning("Modal found but not displayed")
+                    return False
+            except:
+                logger.warning("Modal not found after clicking button")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to click import button: {e}")
+            return False
+        
+    def create_csv_from_products(self, products, csv_path=None):
+        """Create CSV file from products list"""
+        try:
+            import csv
+            import tempfile
+            import os
+            
+            # Use temp directory that works on all OS
+            if csv_path is None:
+                temp_dir = tempfile.gettempdir()
+                csv_path = os.path.join(temp_dir, 'products.csv')
+            
+            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f, delimiter=',')
+                # Header
+                writer.writerow(['SKU', 'Quantity'])
+                # Products
+                for product in products:
+                    writer.writerow([product['sku'], product['quantity']])
+            
+            logger.info(f"CSV file created: {csv_path}")
+            return csv_path
+        except Exception as e:
+            logger.error(f"Failed to create CSV: {e}")
+            return None
+        
+    def upload_csv_to_modal(self, csv_path):
+        """Upload CSV file to the import modal"""
+        try:
+            # Find file input in modal
+            file_input = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="file"]'))
+            )
+            
+            # Send file path to input
+            file_input.send_keys(csv_path)
+            logger.info(f"File uploaded: {csv_path}")
+            
+            time.sleep(1)
+            
+            # Find and click import/submit button
+            # Try common button selectors
+            try:
+                submit_button = self.driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]')
+                submit_button.click()
+                logger.info("Clicked submit button")
+            except:
+                try:
+                    submit_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Import')]")
+                    submit_button.click()
+                    logger.info("Clicked import button")
+                except:
+                    logger.warning("Could not find submit button")
+            
+            time.sleep(2)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to upload CSV: {e}")
+            return False
