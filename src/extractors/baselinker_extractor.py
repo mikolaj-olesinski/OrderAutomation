@@ -62,23 +62,46 @@ class BaseLinkerExtractor(BaseExtractor):
     
     def extract_payment_amount(self):
         """
-        Extract payment amount from BaseLinker
+        Extract payment amount from BaseLinker.
+        - If NOT fully paid: returns "0" (leave B2B payment field empty)
+        - If fully paid: returns paid amount (to fill in B2B)
         
         Returns:
-            str: Payment amount (e.g., "67.95") or None
+            str: Payment amount or "0", or None on error
         """
         try:
+            # Get already paid amount from span[data-tid="editPayment"]
+            try:
+                paid_element = self.driver.find_element(By.CSS_SELECTOR, 'span[data-tid="editPayment"]')
+                paid_text = paid_element.text
+                paid_match = re.search(r'([\d,]+\.?\d*)', paid_text)
+                paid_amount = float(paid_match.group(1).replace(',', '.')) if paid_match else 0.0
+                logger.info(f"Already paid amount: {paid_amount} PLN")
+            except Exception as e:
+                logger.warning(f"Could not extract paid amount, assuming 0: {e}")
+                paid_amount = 0.0
+            
+            # Get total order amount from #sale_total_price
             price_element = self.driver.find_element(By.ID, 'sale_total_price')
             price_text = price_element.text
             
-            # Extract number from "67.95 PLN"
-            amount_match = re.search(r'([\d,]+\.\d+)', price_text)
-            if amount_match:
-                amount = amount_match.group(1)
-                logger.info(f"Payment amount: {amount} PLN")
-                return amount
+            # Extract number from "2081.94 PLN"
+            total_match = re.search(r'([\d,]+\.?\d*)', price_text)
+            if total_match:
+                total_amount = float(total_match.group(1).replace(',', '.'))
+                logger.info(f"Total order amount: {total_amount} PLN")
+                
+                # Check if fully paid
+                if paid_amount >= total_amount and paid_amount > 0:
+                    # Fully paid - return the paid amount
+                    logger.info(f"Order fully paid ({paid_amount} PLN) - returning paid amount")
+                    return str(paid_amount)
+                else:
+                    # Not fully paid - return "0" to leave B2B field empty
+                    logger.info(f"Order NOT fully paid ({paid_amount}/{total_amount}) - returning 0")
+                    return "0"
             
-            logger.warning("Payment amount not found in element")
+            logger.warning("Total amount not found in element")
             return None
             
         except Exception as e:
@@ -193,6 +216,5 @@ class BaseLinkerExtractor(BaseExtractor):
             "payment_amount": self.extract_payment_amount(),
             "phone": self.extract_phone_number(),
             "email": self.extract_email(),
-            "address": self.extract_address(),
-            "b2b_number": self.extract_b2b_number()
+            "address": self.extract_address()
         }

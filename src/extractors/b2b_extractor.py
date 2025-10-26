@@ -338,65 +338,110 @@ class B2BExtractor(BaseExtractor):
             return False
     
     def select_payment_method(self, payment_amount=None):
-        """
-        Select payment method - "Pobranie" (Cash on Delivery)
-        If payment_amount is provided and > 0, fill the amount field
-        
-        Args:
-            payment_amount: Payment amount (optional). If "0" or None, leaves field empty
+            """
+            Select payment method based on payment amount:
+            - If amount is "0" or not provided: Select "Pobranie" (Cash on Delivery) - leave field empty
+            - If amount > 0: Select "Przelew 3 dni" (Bank Transfer)
             
-        Returns:
-            bool: True if payment method selected successfully, False otherwise
-        """
-        try:
-            # Find and click "Pobranie" radio button
-            pobranie_radio = self.wait_for_clickable(
-                By.CSS_SELECTOR,
-                'input[type="radio"][name="payment_id"][value="21"]',
-                timeout=10
-            )
-            
-            if not pobranie_radio:
-                logger.error("'Pobranie' payment method not found")
-                return False
-            
-            # Check if already selected
-            if not pobranie_radio.is_selected():
-                pobranie_radio.click()
-                logger.info("Selected 'Pobranie' payment method")
-                time.sleep(1)
-            else:
-                logger.info("'Pobranie' payment method already selected")
-            
-            # Fill payment amount only if provided and not zero
-            if payment_amount and payment_amount != "0" and payment_amount != "0.00":
+            Args:
+                payment_amount: Payment amount from BaseLinker (str)
+                
+            Returns:
+                bool: True if payment method selected successfully, False otherwise
+            """
+            try:
+                # Wait for payment section to be visible
+                time.sleep(2)
+                
+                # Convert payment_amount to float for comparison
                 try:
-                    payment_input = self.driver.find_element(
-                        By.NAME,
-                        'payment_params[custom_payment_price][21]'
-                    )
-                    payment_input.clear()
+                    amount = float(payment_amount) if payment_amount else 0.0
+                except:
+                    amount = 0.0
+                
+                # Determine which payment method to select
+                if amount > 0:
+                    # Order is already paid - select "Przelew 3 dni" (Bank Transfer)
+                    logger.info(f"Order already paid ({amount} PLN) - selecting 'Przelew 3 dni'")
                     
-                    # Use JavaScript to set value
-                    self.driver.execute_script(
-                        "arguments[0].value = arguments[1];",
-                        payment_input,
-                        str(payment_amount)
-                    )
+                    try:
+                        przelew_radio = self.driver.find_element(
+                            By.CSS_SELECTOR,
+                            'input[type="radio"][name="payment_id"][value="29"]'
+                        )
+                        
+                        if not przelew_radio.is_selected():
+                            self.driver.execute_script("arguments[0].click();", przelew_radio)
+                            logger.info("Selected 'Przelew 3 dni' payment method")
+                            time.sleep(1)
+                        else:
+                            logger.info("'Przelew 3 dni' payment method already selected")
+                            
+                    except Exception as e:
+                        logger.error(f"Could not select 'Przelew 3 dni': {e}")
+                        # Try clicking label
+                        try:
+                            label = self.driver.find_element(
+                                By.CSS_SELECTOR,
+                                'label[for="29"]'
+                            )
+                            self.driver.execute_script("arguments[0].click();", label)
+                            logger.info("Selected 'Przelew 3 dni' using label click")
+                            time.sleep(1)
+                        except Exception as e2:
+                            logger.error(f"Could not click 'Przelew 3 dni' label: {e2}")
+                            return False
+                            
+                else:
+                    # Order NOT paid - select "Pobranie" (Cash on Delivery) with empty field
+                    logger.info("Order NOT paid - selecting 'Pobranie' with empty field")
                     
-                    logger.info(f"Filled payment amount: {payment_amount} zł")
-                except Exception as e:
-                    logger.warning(f"Could not fill payment amount: {e}")
-            else:
-                logger.info("Payment amount is 0 or not provided - leaving field empty")
-            
-            time.sleep(1)
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to select payment method: {e}")
-            return False
-    
+                    try:
+                        pobranie_radio = self.driver.find_element(
+                            By.CSS_SELECTOR,
+                            'input[type="radio"][name="payment_id"][value="21"]'
+                        )
+                        
+                        if not pobranie_radio.is_selected():
+                            self.driver.execute_script("arguments[0].click();", pobranie_radio)
+                            logger.info("Selected 'Pobranie' payment method")
+                            time.sleep(1)
+                        else:
+                            logger.info("'Pobranie' payment method already selected")
+                        
+                        # Make sure the field is EMPTY (don't fill anything)
+                        try:
+                            payment_input = self.driver.find_element(
+                                By.NAME,
+                                'payment_params[custom_payment_price][21]'
+                            )
+                            payment_input.clear()
+                            logger.info("Left 'Pobranie' amount field empty")
+                        except Exception as e:
+                            logger.warning(f"Could not clear payment field: {e}")
+                            
+                    except Exception as e:
+                        logger.error(f"Could not select 'Pobranie': {e}")
+                        # Try clicking label
+                        try:
+                            label = self.driver.find_element(
+                                By.CSS_SELECTOR,
+                                'label[for="21"]'
+                            )
+                            self.driver.execute_script("arguments[0].click();", label)
+                            logger.info("Selected 'Pobranie' using label click")
+                            time.sleep(1)
+                        except Exception as e2:
+                            logger.error(f"Could not click 'Pobranie' label: {e2}")
+                            return False
+                
+                time.sleep(1)
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to select payment method: {e}")
+                return False
+        
     def import_products(self, products):
         """
         Complete flow: open modal, create CSV, and upload

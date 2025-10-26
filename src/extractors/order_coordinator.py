@@ -18,7 +18,7 @@ class OrderCoordinator:
     
     def extract_all_order_data(self):
         """
-        Extract all order data from BaseLinker and B2B Hendi
+        Extract all order data from BaseLinker
         
         Returns:
             dict: Complete order data with keys:
@@ -28,7 +28,6 @@ class OrderCoordinator:
                 - phone: str
                 - email: str
                 - address: dict
-                - b2b_number: str
                 - error: str (only if success=False)
         """
         order_data = {
@@ -37,8 +36,7 @@ class OrderCoordinator:
             "payment_amount": None,
             "phone": None,
             "email": None,
-            "address": None,
-            "b2b_number": None
+            "address": None
         }
         
         try:
@@ -65,22 +63,6 @@ class OrderCoordinator:
             order_data["phone"] = baselinker_data.get("phone")
             order_data["email"] = baselinker_data.get("email")
             order_data["address"] = baselinker_data.get("address")
-            order_data["b2b_number"] = baselinker_data.get("b2b_number")
-            
-            # If B2B number not found in BaseLinker, try B2B Hendi tab
-            if not order_data["b2b_number"]:
-                logger.info("B2B number not in BaseLinker, checking B2B Hendi tab...")
-                
-                # Initialize B2B extractor (reuse same Chrome connection)
-                self.b2b_extractor = B2BExtractor(self.chrome_debug_port)
-                self.b2b_extractor.driver = self.baselinker_extractor.driver
-                
-                if self.b2b_extractor.find_b2b_hendi_tab():
-                    b2b_num = self.b2b_extractor.extract_b2b_number()
-                    if b2b_num:
-                        order_data["b2b_number"] = b2b_num
-                else:
-                    logger.warning("B2B Hendi tab not found")
             
             order_data["success"] = True
             logger.info("Order data extraction completed successfully")
@@ -93,8 +75,6 @@ class OrderCoordinator:
             # Clean up
             if self.baselinker_extractor:
                 self.baselinker_extractor.close()
-            if self.b2b_extractor:
-                self.b2b_extractor.close()
         
         return order_data
     

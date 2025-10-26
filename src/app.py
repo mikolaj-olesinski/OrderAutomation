@@ -2,20 +2,27 @@ from flask import Flask, render_template, jsonify, request
 import json
 import logging
 import os
+import sys
 from chrome_manager import ChromeManager
 from extractors import OrderCoordinator, B2BExtractor
 
 app = Flask(__name__)
 
-# Setup logging
+# Setup logging with UTF-8 encoding for Windows
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('app.log'),
-        logging.StreamHandler()
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
     ]
 )
+
+# Fix console encoding for Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
 logger = logging.getLogger(__name__)
 
 # Load config
@@ -40,6 +47,25 @@ def get_status():
     config = load_config()
     status = chrome_manager.check_status(config)
     return jsonify(status)
+
+@app.route('/api/logs')
+def get_logs():
+    """Get recent logs from app.log file"""
+    try:
+        log_file = 'app.log'
+        if not os.path.exists(log_file):
+            return jsonify({'logs': []})
+        
+        # Read last 100 lines from log file
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            # Get last 100 lines
+            recent_lines = lines[-100:] if len(lines) > 100 else lines
+            
+        return jsonify({'logs': recent_lines})
+    except Exception as e:
+        logger.error(f"Failed to read logs: {e}")
+        return jsonify({'logs': [], 'error': str(e)})
 
 @app.route('/api/launch-chrome', methods=['POST'])
 def launch_chrome():

@@ -1,2 +1,9 @@
-- ip ustawiamy w docker-compose
-- sciezka do chrome 
+TODO
+- logi na frontendzie 
+- dodac zeby mozna bylo konfigurowac to przez to config
+- zarzadzanie jakby stepami 
+- wyglad jakos troche lepszy
+
+
+- zdeployowac na dockera
+- sprawedzic czy dziala na macbooku
