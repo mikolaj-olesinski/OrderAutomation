@@ -59,7 +59,6 @@ def get_logs():
         # Read last 100 lines from log file
         with open(log_file, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-            # Get last 100 lines
             recent_lines = lines[-100:] if len(lines) > 100 else lines
             
         return jsonify({'logs': recent_lines})
@@ -83,7 +82,7 @@ def extract_order():
         port = config.get('chrome_debug_port', 9222)
         
         logger.info(f"Creating OrderCoordinator with port {port}")
-        coordinator = OrderCoordinator(chrome_debug_port=port)
+        coordinator = OrderCoordinator(chrome_debug_port=port, config=config)
         
         logger.info("Calling extract_all_order_data()")
         order_data = coordinator.extract_all_order_data()
@@ -126,7 +125,7 @@ def open_import_modal():
         config = load_config()
         port = config.get('chrome_debug_port', 9222)
         
-        extractor = B2BExtractor(chrome_debug_port=port)
+        extractor = B2BExtractor(chrome_debug_port=port, config=config)
         
         # Connect to Chrome
         if not extractor.connect_to_chrome():
@@ -185,7 +184,7 @@ def import_products():
         port = config.get('chrome_debug_port', 9222)
         
         # Use OrderCoordinator for simplified import
-        coordinator = OrderCoordinator(chrome_debug_port=port)
+        coordinator = OrderCoordinator(chrome_debug_port=port, config=config)
         result = coordinator.import_products_to_b2b(products)
         
         if result['success']:
@@ -225,14 +224,13 @@ def complete_order():
             }), 400
         
         # Prepare address data for B2B format
-        # Use full address in street field, dot in building number
         address_data = {
             'name': address.get('company', ''),
             'phone': address.get('phone', ''),
             'email': data.get('email', ''),
-            'street': address.get('address', ''),  # Full address in street
-            'street_no': '.',  # Dot as building number
-            'street_flat': '',  # Optional
+            'street': address.get('address', ''),
+            'street_no': '.',
+            'street_flat': '',
             'zip': address.get('postal_code', ''),
             'city': address.get('city', '')
         }
@@ -241,7 +239,7 @@ def complete_order():
         port = config.get('chrome_debug_port', 9222)
         
         # Use OrderCoordinator for complete order
-        coordinator = OrderCoordinator(chrome_debug_port=port)
+        coordinator = OrderCoordinator(chrome_debug_port=port, config=config)
         result = coordinator.complete_order_with_address(products, address_data, payment_amount)
         
         if result['success']:

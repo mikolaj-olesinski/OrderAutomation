@@ -7,3 +7,9 @@ TODO
 
 - zdeployowac na dockera
 - sprawedzic czy dziala na macbooku
+
+
+Done:
+-- wyglad jakos troche lepszy
+-- logi na frontendzie 
+- dodac zeby mozna bylo konfigurowac to przez to config

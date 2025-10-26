@@ -18,9 +18,18 @@ class B2BExtractor(BaseExtractor):
     
     B2B_KEYWORDS = ["b2b", "hendi"]
     
+    def __init__(self, chrome_debug_port=9222, config=None):
+        super().__init__(chrome_debug_port, config)
+        self.selectors = self.config.get('b2b_selectors', {})
+        self.patterns = self.config.get('regex_patterns', {}).get('b2b', {})
+        self.data_processing = self.config.get('data_processing', {})
+        self.csv_config = self.config.get('csv_config', {})
+        self.payment_methods = self.config.get('payment_methods', {})
+        
     def find_b2b_hendi_tab(self):
         """Find and switch to B2B Hendi tab"""
-        return self.find_tab_by_keywords(self.B2B_KEYWORDS)
+        keywords = self.config.get('b2b_keywords', self.B2B_KEYWORDS)
+        return self.find_tab_by_keywords(keywords)
     
     def extract_b2b_number(self):
         """
@@ -30,12 +39,13 @@ class B2BExtractor(BaseExtractor):
             str: B2B order number (e.g., "20451149") or None
         """
         try:
-            container = self.driver.find_element(By.CLASS_NAME, 'he-order-settings')
+            container_class = self.selectors.get('order_settings_container', 'he-order-settings')
+            pattern = self.patterns.get('order_number', r'Numer:\s*(\d+)\s*\/\s*(\d+)')
+            
+            container = self.driver.find_element(By.CLASS_NAME, container_class)
             text = container.text
             
-            # Pattern: Numer: 20451149 / 2024
-            b2b_pattern = r'Numer:\s*(\d+)\s*\/\s*(\d+)'
-            b2b_match = re.search(b2b_pattern, text)
+            b2b_match = re.search(pattern, text)
             
             if b2b_match:
                 b2b_number = b2b_match.group(1)
@@ -58,11 +68,16 @@ class B2BExtractor(BaseExtractor):
             bool: True if modal opened successfully, False otherwise
         """
         try:
+            import_button_selector = self.selectors.get('import_button', 
+                'button.jsShowModalButton[data-modal=".jsImportProductsModal"]')
+            modal_class = self.selectors.get('import_modal', '.jsImportProductsModal')
+            modal_delay = self.timing.get('modal_open_delay', 1)
+            
             # Find and click the import button
             import_button = self.wait_for_clickable(
                 By.CSS_SELECTOR, 
-                'button.jsShowModalButton[data-modal=".jsImportProductsModal"]',
-                timeout=10
+                import_button_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not import_button:
@@ -72,12 +87,11 @@ class B2BExtractor(BaseExtractor):
             import_button.click()
             logger.info("Clicked 'Importuj produkty' button")
             
-            # Wait a bit for modal to appear
-            time.sleep(1)
+            time.sleep(modal_delay)
             
             # Check if modal appeared
             try:
-                modal = self.driver.find_element(By.CLASS_NAME, 'jsImportProductsModal')
+                modal = self.driver.find_element(By.CSS_SELECTOR, modal_class)
                 if modal.is_displayed():
                     logger.info("Import modal opened successfully")
                     return True
@@ -104,16 +118,19 @@ class B2BExtractor(BaseExtractor):
             str: Path to created CSV file or None if failed
         """
         try:
-            # Use temp directory that works on all OS
+            delimiter = self.csv_config.get('delimiter', ',')
+            headers = self.csv_config.get('headers', ['SKU', 'Quantity'])
+            encoding = self.csv_config.get('encoding', 'utf-8')
+            
             if csv_path is None:
                 temp_dir = tempfile.gettempdir()
                 csv_path = os.path.join(temp_dir, 'products.csv')
             
-            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f, delimiter=',')
+            with open(csv_path, 'w', newline='', encoding=encoding) as f:
+                writer = csv.writer(f, delimiter=delimiter)
                 
                 # Header
-                writer.writerow(['SKU', 'Quantity'])
+                writer.writerow(headers)
                 
                 # Products
                 for product in products:
@@ -137,11 +154,24 @@ class B2BExtractor(BaseExtractor):
             bool: True if upload successful, False otherwise
         """
         try:
+            file_input_selector = self.selectors.get('file_input', 'input[type="file"]')
+            continue_button_selector = self.selectors.get('continue_button',
+                'button.jsImportNextStepButton[type="submit"][form="import-form"]')
+            add_to_cart_selector = self.selectors.get('add_to_cart_button',
+                'button.jsManyProductsToCart[type="submit"]')
+            checkout_selector = self.selectors.get('checkout_button',
+                'button.jsCheckoutButton[type="submit"]')
+            new_address_checkbox_id = self.selectors.get('new_address_checkbox', 'new_delivery_address')
+            
+            # Get timing delays
+            after_upload_delay = self.timing.get('after_file_upload_delay', 1)
+            between_steps_delay = self.timing.get('between_steps_delay', 2)
+            
             # Find file input in modal
             file_input = self.wait_for_element(
                 By.CSS_SELECTOR, 
-                'input[type="file"]',
-                timeout=10
+                file_input_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not file_input:
@@ -152,13 +182,13 @@ class B2BExtractor(BaseExtractor):
             file_input.send_keys(csv_path)
             logger.info(f"File uploaded: {csv_path}")
             
-            time.sleep(1)
+            time.sleep(after_upload_delay)
             
-            # First click: Find and click the "Kontynuuj" button
+            # First click: "Kontynuuj" button
             kontynuuj_button = self.wait_for_clickable(
                 By.CSS_SELECTOR,
-                'button.jsImportNextStepButton[type="submit"][form="import-form"]',
-                timeout=10
+                continue_button_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not kontynuuj_button:
@@ -168,13 +198,13 @@ class B2BExtractor(BaseExtractor):
             kontynuuj_button.click()
             logger.info("Clicked 'Kontynuuj' button (first time)")
             
-            time.sleep(2)
+            time.sleep(between_steps_delay)
             
-            # Second click: Find and click the "Kontynuuj" button again
+            # Second click: "Kontynuuj" button again
             kontynuuj_button_2 = self.wait_for_clickable(
                 By.CSS_SELECTOR,
-                'button.jsImportNextStepButton[type="submit"][form="import-form"]',
-                timeout=10
+                continue_button_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not kontynuuj_button_2:
@@ -184,13 +214,13 @@ class B2BExtractor(BaseExtractor):
             kontynuuj_button_2.click()
             logger.info("Clicked 'Kontynuuj' button (second time)")
             
-            time.sleep(2)
+            time.sleep(between_steps_delay)
             
-            # Third click: Find and click "Dodaj produkty do koszyka" button
+            # Third click: "Dodaj produkty do koszyka" button
             add_to_cart_button = self.wait_for_clickable(
                 By.CSS_SELECTOR,
-                'button.jsManyProductsToCart[type="submit"]',
-                timeout=10
+                add_to_cart_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not add_to_cart_button:
@@ -200,13 +230,13 @@ class B2BExtractor(BaseExtractor):
             add_to_cart_button.click()
             logger.info("Clicked 'Dodaj produkty do koszyka' button")
             
-            time.sleep(2)
+            time.sleep(between_steps_delay)
             
-            # Fourth click: Find and click "Przejdź do zamówienia" button
+            # Fourth click: "Przejdź do zamówienia" button
             checkout_button = self.wait_for_clickable(
                 By.CSS_SELECTOR,
-                'button.jsCheckoutButton[type="submit"]',
-                timeout=10
+                checkout_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not checkout_button:
@@ -216,24 +246,23 @@ class B2BExtractor(BaseExtractor):
             checkout_button.click()
             logger.info("Clicked 'Przejdź do zamówienia' button")
             
-            time.sleep(2)
+            time.sleep(between_steps_delay)
             
             # Check and toggle "Wprowadź nowy adres dostawy" checkbox if not checked
             try:
                 new_address_checkbox = self.driver.find_element(
                     By.ID,
-                    'new_delivery_address'
+                    new_address_checkbox_id
                 )
                 
                 if not new_address_checkbox.is_selected():
-                    # Click the label to toggle checkbox
                     checkbox_label = self.driver.find_element(
                         By.CSS_SELECTOR,
-                        'label[for="new_delivery_address"]'
+                        f'label[for="{new_address_checkbox_id}"]'
                     )
                     checkbox_label.click()
                     logger.info("Checked 'Wprowadź nowy adres dostawy' checkbox")
-                    time.sleep(1)
+                    time.sleep(after_upload_delay)
                 else:
                     logger.info("'Wprowadź nowy adres dostawy' checkbox already checked")
                     
@@ -252,24 +281,26 @@ class B2BExtractor(BaseExtractor):
         
         Args:
             address_data: Dict with keys:
-                - name: Company name (required)
-                - phone: Phone number (required)
-                - email: Email address (required)
-                - street: Street name (required)
-                - street_no: Building number (required)
-                - street_flat: Apartment number (optional)
-                - zip: Postal code (required)
-                - city: City name (required)
+                - name, phone, email, street, street_no, street_flat, zip, city
                 
         Returns:
             bool: True if form filled and submitted successfully, False otherwise
         """
         try:
+            modal_selector = self.selectors.get('address_modal', '.jsAddAddressModal')
+            save_button_selector = self.selectors.get('save_address_button',
+                'button[type="submit"][form="user-address-form"]')
+            form_fields = self.selectors.get('address_form_fields', {})
+            
+            form_submit_delay = self.timing.get('form_submit_delay', 2)
+            after_click_delay = self.timing.get('after_click_delay', 1)
+            use_javascript = self.config.get('options', {}).get('use_javascript_for_form_filling', True)
+            
             # Wait for modal to appear
             modal = self.wait_for_element(
                 By.CSS_SELECTOR,
-                '.jsAddAddressModal',
-                timeout=10
+                modal_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not modal:
@@ -278,49 +309,56 @@ class B2BExtractor(BaseExtractor):
             
             logger.info("Address modal found, filling form...")
             
-            # Helper function to fill input with proper encoding
+            # Helper function to fill input
             def fill_input(name, value):
                 try:
-                    input_element = self.driver.find_element(By.NAME, name)
+                    field_name = form_fields.get(name.replace('address_data[', '').replace(']', ''), name)
+                    input_element = self.driver.find_element(By.NAME, field_name)
                     input_element.clear()
-                    # Use JavaScript to set value to preserve Polish characters
-                    self.driver.execute_script(
-                        "arguments[0].value = arguments[1];",
-                        input_element,
-                        str(value)
-                    )
-                    # Trigger input event to ensure form validation
-                    self.driver.execute_script(
-                        "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));",
-                        input_element
-                    )
-                    logger.info(f"Filled {name}: {value}")
+                    
+                    if use_javascript:
+                        # Use JavaScript to set value to preserve Polish characters
+                        self.driver.execute_script(
+                            "arguments[0].value = arguments[1];",
+                            input_element,
+                            str(value)
+                        )
+                        # Trigger input event
+                        self.driver.execute_script(
+                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));",
+                            input_element
+                        )
+                    else:
+                        input_element.send_keys(str(value))
+                    
+                    logger.info(f"Filled {field_name}: {value}")
                     return True
                 except Exception as e:
-                    logger.error(f"Failed to fill {name}: {e}")
+                    logger.error(f"Failed to fill {field_name}: {e}")
                     return False
             
             # Fill all fields
-            fill_input('address_data[name]', address_data.get('name', ''))
-            fill_input('address_data[phone]', address_data.get('phone', ''))
-            fill_input('address_data[email]', address_data.get('email', ''))
-            fill_input('address_data[street]', address_data.get('street', ''))
-            fill_input('address_data[street_no]', address_data.get('street_no', '.'))
+            default_building = self.data_processing.get('default_building_number', '.')
             
-            # Fill apartment number if provided
+            fill_input('name', address_data.get('name', ''))
+            fill_input('phone', address_data.get('phone', ''))
+            fill_input('email', address_data.get('email', ''))
+            fill_input('street', address_data.get('street', ''))
+            fill_input('street_no', address_data.get('street_no', default_building))
+            
             if address_data.get('street_flat'):
-                fill_input('address_data[street_flat]', address_data.get('street_flat'))
+                fill_input('street_flat', address_data.get('street_flat'))
             
-            fill_input('address_data[zip]', address_data.get('zip', ''))
-            fill_input('address_data[city]', address_data.get('city', ''))
+            fill_input('zip', address_data.get('zip', ''))
+            fill_input('city', address_data.get('city', ''))
             
-            time.sleep(1)
+            time.sleep(after_click_delay)
             
-            # Click "Zapisz" button to submit the form
+            # Click "Zapisz" button
             save_button = self.wait_for_clickable(
                 By.CSS_SELECTOR,
-                'button[type="submit"][form="user-address-form"]',
-                timeout=10
+                save_button_selector,
+                timeout=self.element_wait_timeout
             )
             
             if not save_button:
@@ -330,7 +368,7 @@ class B2BExtractor(BaseExtractor):
             save_button.click()
             logger.info("Clicked 'Zapisz' button")
             
-            time.sleep(2)
+            time.sleep(form_submit_delay)
             return True
             
         except Exception as e:
@@ -338,109 +376,115 @@ class B2BExtractor(BaseExtractor):
             return False
     
     def select_payment_method(self, payment_amount=None):
-            """
-            Select payment method based on payment amount:
-            - If amount is "0" or not provided: Select "Pobranie" (Cash on Delivery) - leave field empty
-            - If amount > 0: Select "Przelew 3 dni" (Bank Transfer)
+        """
+        Select payment method based on payment amount
+        
+        Args:
+            payment_amount: Payment amount from BaseLinker (str)
             
-            Args:
-                payment_amount: Payment amount from BaseLinker (str)
-                
-            Returns:
-                bool: True if payment method selected successfully, False otherwise
-            """
+        Returns:
+            bool: True if payment method selected successfully
+        """
+        try:
+            payment_selectors = self.selectors.get('payment', {})
+            bank_transfer_value = self.payment_methods.get('bank_transfer_value', '29')
+            cash_on_delivery_value = self.payment_methods.get('cash_on_delivery_value', '21')
+            
+            payment_delay = self.timing.get('payment_section_delay', 2)
+            after_click_delay = self.timing.get('after_click_delay', 1)
+            
+            time.sleep(payment_delay)
+            
+            # Convert payment_amount to float
             try:
-                # Wait for payment section to be visible
-                time.sleep(2)
+                amount = float(payment_amount) if payment_amount else 0.0
+            except:
+                amount = 0.0
+            
+            if amount > 0:
+                # Order paid - select bank transfer
+                logger.info(f"Order already paid ({amount} PLN) - selecting 'Przelew 3 dni'")
                 
-                # Convert payment_amount to float for comparison
                 try:
-                    amount = float(payment_amount) if payment_amount else 0.0
-                except:
-                    amount = 0.0
-                
-                # Determine which payment method to select
-                if amount > 0:
-                    # Order is already paid - select "Przelew 3 dni" (Bank Transfer)
-                    logger.info(f"Order already paid ({amount} PLN) - selecting 'Przelew 3 dni'")
+                    przelew_radio = self.driver.find_element(
+                        By.CSS_SELECTOR,
+                        payment_selectors.get('bank_transfer_radio',
+                            f'input[type="radio"][name="payment_id"][value="{bank_transfer_value}"]')
+                    )
                     
-                    try:
-                        przelew_radio = self.driver.find_element(
-                            By.CSS_SELECTOR,
-                            'input[type="radio"][name="payment_id"][value="29"]'
-                        )
+                    if not przelew_radio.is_selected():
+                        self.driver.execute_script("arguments[0].click();", przelew_radio)
+                        logger.info("Selected 'Przelew 3 dni' payment method")
+                        time.sleep(after_click_delay)
+                    else:
+                        logger.info("'Przelew 3 dni' payment method already selected")
                         
-                        if not przelew_radio.is_selected():
-                            self.driver.execute_script("arguments[0].click();", przelew_radio)
-                            logger.info("Selected 'Przelew 3 dni' payment method")
-                            time.sleep(1)
-                        else:
-                            logger.info("'Przelew 3 dni' payment method already selected")
-                            
-                    except Exception as e:
-                        logger.error(f"Could not select 'Przelew 3 dni': {e}")
-                        # Try clicking label
-                        try:
-                            label = self.driver.find_element(
-                                By.CSS_SELECTOR,
-                                'label[for="29"]'
-                            )
-                            self.driver.execute_script("arguments[0].click();", label)
-                            logger.info("Selected 'Przelew 3 dni' using label click")
-                            time.sleep(1)
-                        except Exception as e2:
-                            logger.error(f"Could not click 'Przelew 3 dni' label: {e2}")
-                            return False
-                            
-                else:
-                    # Order NOT paid - select "Pobranie" (Cash on Delivery) with empty field
-                    logger.info("Order NOT paid - selecting 'Pobranie' with empty field")
+                except Exception as e:
+                    logger.error(f"Could not select 'Przelew 3 dni': {e}")
+                    # Try clicking label
+                    try:
+                        label = self.driver.find_element(
+                            By.CSS_SELECTOR,
+                            payment_selectors.get('bank_transfer_label', f'label[for="{bank_transfer_value}"]')
+                        )
+                        self.driver.execute_script("arguments[0].click();", label)
+                        logger.info("Selected 'Przelew 3 dni' using label click")
+                        time.sleep(after_click_delay)
+                    except Exception as e2:
+                        logger.error(f"Could not click 'Przelew 3 dni' label: {e2}")
+                        return False
+                        
+            else:
+                # Order NOT paid - select cash on delivery
+                logger.info("Order NOT paid - selecting 'Pobranie' with empty field")
+                
+                try:
+                    pobranie_radio = self.driver.find_element(
+                        By.CSS_SELECTOR,
+                        payment_selectors.get('cash_on_delivery_radio',
+                            f'input[type="radio"][name="payment_id"][value="{cash_on_delivery_value}"]')
+                    )
                     
+                    if not pobranie_radio.is_selected():
+                        self.driver.execute_script("arguments[0].click();", pobranie_radio)
+                        logger.info("Selected 'Pobranie' payment method")
+                        time.sleep(after_click_delay)
+                    else:
+                        logger.info("'Pobranie' payment method already selected")
+                    
+                    # Make sure field is empty
                     try:
-                        pobranie_radio = self.driver.find_element(
-                            By.CSS_SELECTOR,
-                            'input[type="radio"][name="payment_id"][value="21"]'
+                        payment_input = self.driver.find_element(
+                            By.NAME,
+                            payment_selectors.get('cash_amount_field',
+                                f'payment_params[custom_payment_price][{cash_on_delivery_value}]')
                         )
-                        
-                        if not pobranie_radio.is_selected():
-                            self.driver.execute_script("arguments[0].click();", pobranie_radio)
-                            logger.info("Selected 'Pobranie' payment method")
-                            time.sleep(1)
-                        else:
-                            logger.info("'Pobranie' payment method already selected")
-                        
-                        # Make sure the field is EMPTY (don't fill anything)
-                        try:
-                            payment_input = self.driver.find_element(
-                                By.NAME,
-                                'payment_params[custom_payment_price][21]'
-                            )
-                            payment_input.clear()
-                            logger.info("Left 'Pobranie' amount field empty")
-                        except Exception as e:
-                            logger.warning(f"Could not clear payment field: {e}")
-                            
+                        payment_input.clear()
+                        logger.info("Left 'Pobranie' amount field empty")
                     except Exception as e:
-                        logger.error(f"Could not select 'Pobranie': {e}")
-                        # Try clicking label
-                        try:
-                            label = self.driver.find_element(
-                                By.CSS_SELECTOR,
-                                'label[for="21"]'
-                            )
-                            self.driver.execute_script("arguments[0].click();", label)
-                            logger.info("Selected 'Pobranie' using label click")
-                            time.sleep(1)
-                        except Exception as e2:
-                            logger.error(f"Could not click 'Pobranie' label: {e2}")
-                            return False
-                
-                time.sleep(1)
-                return True
-                
-            except Exception as e:
-                logger.error(f"Failed to select payment method: {e}")
-                return False
+                        logger.warning(f"Could not clear payment field: {e}")
+                        
+                except Exception as e:
+                    logger.error(f"Could not select 'Pobranie': {e}")
+                    # Try clicking label
+                    try:
+                        label = self.driver.find_element(
+                            By.CSS_SELECTOR,
+                            payment_selectors.get('cash_on_delivery_label', f'label[for="{cash_on_delivery_value}"]')
+                        )
+                        self.driver.execute_script("arguments[0].click();", label)
+                        logger.info("Selected 'Pobranie' using label click")
+                        time.sleep(after_click_delay)
+                    except Exception as e2:
+                        logger.error(f"Could not click 'Pobranie' label: {e2}")
+                        return False
+            
+            time.sleep(after_click_delay)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to select payment method: {e}")
+            return False
         
     def import_products(self, products):
         """

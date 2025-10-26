@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 class OrderCoordinator:
     """Coordinates extraction from multiple sources"""
     
-    def __init__(self, chrome_debug_port=9222):
+    def __init__(self, chrome_debug_port=9222, config=None):
         self.chrome_debug_port = chrome_debug_port
+        self.config = config or {}
         self.baselinker_extractor = None
         self.b2b_extractor = None
     
@@ -21,14 +22,7 @@ class OrderCoordinator:
         Extract all order data from BaseLinker
         
         Returns:
-            dict: Complete order data with keys:
-                - success: bool
-                - products: list
-                - payment_amount: str
-                - phone: str
-                - email: str
-                - address: dict
-                - error: str (only if success=False)
+            dict: Complete order data
         """
         order_data = {
             "success": False,
@@ -40,8 +34,8 @@ class OrderCoordinator:
         }
         
         try:
-            # Initialize BaseLinker extractor
-            self.baselinker_extractor = BaseLinkerExtractor(self.chrome_debug_port)
+            # Initialize BaseLinker extractor with config
+            self.baselinker_extractor = BaseLinkerExtractor(self.chrome_debug_port, self.config)
             
             # Connect to Chrome
             if not self.baselinker_extractor.connect_to_chrome():
@@ -57,7 +51,7 @@ class OrderCoordinator:
                 self.baselinker_extractor.close()
                 return order_data
             
-            # Populate order data from BaseLinker
+            # Populate order data
             order_data["products"] = baselinker_data.get("products", [])
             order_data["payment_amount"] = baselinker_data.get("payment_amount")
             order_data["phone"] = baselinker_data.get("phone")
@@ -72,7 +66,6 @@ class OrderCoordinator:
             order_data["error"] = str(e)
         
         finally:
-            # Clean up
             if self.baselinker_extractor:
                 self.baselinker_extractor.close()
         
@@ -86,14 +79,11 @@ class OrderCoordinator:
             products: List of dicts with 'sku' and 'quantity' keys
             
         Returns:
-            dict: Result with keys:
-                - success: bool
-                - message: str (if success)
-                - error: str (if not success)
+            dict: Result
         """
         try:
-            # Initialize B2B extractor
-            self.b2b_extractor = B2BExtractor(self.chrome_debug_port)
+            # Initialize B2B extractor with config
+            self.b2b_extractor = B2BExtractor(self.chrome_debug_port, self.config)
             
             # Connect to Chrome
             if not self.b2b_extractor.connect_to_chrome():
@@ -133,18 +123,15 @@ class OrderCoordinator:
         
         Args:
             products: List of dicts with 'sku' and 'quantity' keys
-            address_data: Dict with address fields (name, phone, email, street, etc.)
-            payment_amount: Payment amount (optional). If "0" or None, leaves field empty
+            address_data: Dict with address fields
+            payment_amount: Payment amount (optional)
             
         Returns:
-            dict: Result with keys:
-                - success: bool
-                - message: str (if success)
-                - error: str (if not success)
+            dict: Result
         """
         try:
-            # Initialize B2B extractor
-            self.b2b_extractor = B2BExtractor(self.chrome_debug_port)
+            # Initialize B2B extractor with config
+            self.b2b_extractor = B2BExtractor(self.chrome_debug_port, self.config)
             
             # Connect to Chrome
             if not self.b2b_extractor.connect_to_chrome():
@@ -153,7 +140,7 @@ class OrderCoordinator:
                     "error": "Could not connect to Chrome"
                 }
             
-            # Import products (this will also check the new address checkbox)
+            # Import products
             logger.info("Importing products...")
             success = self.b2b_extractor.import_products(products)
             
@@ -163,7 +150,7 @@ class OrderCoordinator:
                     "error": "Failed to import products"
                 }
             
-            # Fill delivery address form
+            # Fill delivery address
             logger.info("Filling delivery address...")
             success = self.b2b_extractor.fill_delivery_address(address_data)
             

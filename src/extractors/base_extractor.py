@@ -15,14 +15,23 @@ logger = logging.getLogger(__name__)
 class BaseExtractor:
     """Base class for all extractors with common Selenium functionality"""
     
-    def __init__(self, chrome_debug_port=9222):
+    def __init__(self, chrome_debug_port=9222, config=None):
         self.chrome_debug_port = chrome_debug_port
+        self.config = config or {}
         self.driver = None
         self._chrome_host = self._detect_chrome_host()
+        
+        # Get timing configuration
+        self.timing = self.config.get('timing', {})
+        self.default_timeout = self.timing.get('default_timeout', 10)
+        self.element_wait_timeout = self.timing.get('element_wait_timeout', 10)
     
     def _detect_chrome_host(self):
         """Detect the correct Chrome host (for Docker compatibility)"""
         import requests
+        
+        if not self.config.get('options', {}).get('auto_detect_chrome_host', True):
+            return '127.0.0.1'
         
         hosts = ['127.0.0.1']
         
@@ -95,18 +104,21 @@ class BaseExtractor:
             logger.error(f"Error finding tab: {e}")
             return False
     
-    def wait_for_element(self, by, value, timeout=10):
+    def wait_for_element(self, by, value, timeout=None):
         """
         Wait for element to be present
         
         Args:
             by: Selenium By locator type
             value: Locator value
-            timeout: Maximum wait time in seconds
+            timeout: Maximum wait time in seconds (uses config if not provided)
             
         Returns:
             WebElement or None
         """
+        if timeout is None:
+            timeout = self.element_wait_timeout
+            
         try:
             element = WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located((by, value))
@@ -116,18 +128,21 @@ class BaseExtractor:
             logger.error(f"Element not found: {by}={value}, error: {e}")
             return None
     
-    def wait_for_clickable(self, by, value, timeout=10):
+    def wait_for_clickable(self, by, value, timeout=None):
         """
         Wait for element to be clickable
         
         Args:
             by: Selenium By locator type
             value: Locator value
-            timeout: Maximum wait time in seconds
+            timeout: Maximum wait time in seconds (uses config if not provided)
             
         Returns:
             WebElement or None
         """
+        if timeout is None:
+            timeout = self.element_wait_timeout
+            
         try:
             element = WebDriverWait(self.driver, timeout).until(
                 EC.element_to_be_clickable((by, value))

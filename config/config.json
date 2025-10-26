@@ -5,5 +5,104 @@
   "baselinker_url": "https://panel-g.baselinker.com/orders.php#status:26890",
   "b2b_hendi_url": "https://b2b.hendi.com/",
   "baselinker_keywords": ["baselinker", "base", "linker"],
-  "b2b_keywords": ["b2b", "hendi"]
+  "b2b_keywords": ["b2b", "hendi"],
+  
+  "baselinker_selectors": {
+    "products_container": "sale_items_container",
+    "total_price": "sale_total_price",
+    "paid_amount": "span[data-tid=\"editPayment\"]",
+    "phone": "oms_info_phone",
+    "email": "oms_info_email",
+    "address": {
+      "fullname": "oms_delivery_delivery_fullname",
+      "company": "oms_delivery_delivery_company",
+      "street": "oms_delivery_delivery_address",
+      "city": "oms_delivery_delivery_city",
+      "postcode": "oms_delivery_delivery_postcode"
+    },
+    "b2b_number_field": "oms_info_extra_field_1"
+  },
+  
+  "regex_patterns": {
+    "baselinker": {
+      "sku": "SKU\\s*([A-Za-z0-9\\-\\.]+)",
+      "quantity": "(\\d+)\\s+\\d+\\.\\d+ PLN",
+      "price_amount": "([\\d,]+\\.?\\d*)"
+    },
+    "b2b": {
+      "order_number": "Numer:\\s*(\\d+)\\s*\\/\\s*(\\d+)"
+    }
+  },
+  
+  "b2b_selectors": {
+    "order_settings_container": "he-order-settings",
+    "import_button": "button.jsShowModalButton[data-modal=\".jsImportProductsModal\"]",
+    "import_modal": ".jsImportProductsModal",
+    "file_input": "input[type=\"file\"]",
+    "continue_button": "button.jsImportNextStepButton[type=\"submit\"][form=\"import-form\"]",
+    "add_to_cart_button": "button.jsManyProductsToCart[type=\"submit\"]",
+    "checkout_button": "button.jsCheckoutButton[type=\"submit\"]",
+    "new_address_checkbox": "new_delivery_address",
+    "address_modal": ".jsAddAddressModal",
+    "save_address_button": "button[type=\"submit\"][form=\"user-address-form\"]",
+    "address_form_fields": {
+      "name": "address_data[name]",
+      "phone": "address_data[phone]",
+      "email": "address_data[email]",
+      "street": "address_data[street]",
+      "street_no": "address_data[street_no]",
+      "street_flat": "address_data[street_flat]",
+      "zip": "address_data[zip]",
+      "city": "address_data[city]"
+    },
+    "payment": {
+      "bank_transfer_radio": "input[type=\"radio\"][name=\"payment_id\"][value=\"29\"]",
+      "cash_on_delivery_radio": "input[type=\"radio\"][name=\"payment_id\"][value=\"21\"]",
+      "cash_amount_field": "payment_params[custom_payment_price][21]",
+      "bank_transfer_label": "label[for=\"29\"]",
+      "cash_on_delivery_label": "label[for=\"21\"]"
+    }
+  },
+  
+  "payment_methods": {
+    "bank_transfer_value": "29",
+    "cash_on_delivery_value": "21"
+  },
+  
+  "csv_config": {
+    "delimiter": ",",
+    "headers": ["SKU", "Quantity"],
+    "encoding": "utf-8"
+  },
+  
+  "timing": {
+    "default_timeout": 10,
+    "element_wait_timeout": 10,
+    "after_click_delay": 1,
+    "after_file_upload_delay": 1,
+    "between_steps_delay": 2,
+    "chrome_startup_delay": 2,
+    "modal_open_delay": 1,
+    "form_submit_delay": 2,
+    "payment_section_delay": 2
+  },
+  
+  "data_processing": {
+    "remove_sku_prefix": "H-",
+    "remove_phone_prefix": "+48",
+    "default_building_number": ".",
+    "skip_b2b_number_values": ["...", ""]
+  },
+  
+  "helper_service": {
+    "default_url": "http://127.0.0.1:5001",
+    "docker_url": "http://host.docker.internal:5001"
+  },
+  
+  "options": {
+    "auto_detect_chrome_host": true,
+    "use_javascript_for_form_filling": true,
+    "preserve_polish_characters": true,
+    "log_level": "INFO"
+  }
 }
