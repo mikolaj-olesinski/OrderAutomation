@@ -8,6 +8,9 @@ APP_DIR="$APP_NAME.app"
 echo "Tworzenie aplikacji macOS: $APP_NAME"
 echo ""
 
+# Przejdź do głównego katalogu projektu (jeden poziom wyżej od scripts/)
+cd "$(dirname "$0")/.."
+
 # Utwórz strukturę .app
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
@@ -53,7 +56,7 @@ if [ ! -d "venv" ]; then
     # Otwórz Terminal z instalacją
     osascript <<APPLESCRIPT
 tell application "Terminal"
-    do script "cd '$APP_PATH' && chmod +x install-mac.sh && ./install-mac.sh && echo '' && echo 'Instalacja zakończona! Zamknij to okno i uruchom aplikację ponownie.' && read -p 'Naciśnij Enter...'"
+    do script "cd '$APP_PATH' && chmod +x scripts/install-mac.sh && ./scripts/install-mac.sh && echo '' && echo 'Instalacja zakończona! Zamknij to okno i uruchom aplikację ponownie.' && exec bash"
     activate
 end tell
 APPLESCRIPT
@@ -76,9 +79,6 @@ open "http://127.0.0.1:5000"
 EOF
 
 chmod +x "$APP_DIR/Contents/MacOS/launcher"
-
-# Utwórz prostą ikonę (opcjonalnie - możesz dodać własną)
-# Dla prostoty, pomijamy ikonę - macOS użyje domyślnej
 
 echo "✅ Aplikacja utworzona: $APP_DIR"
 echo ""

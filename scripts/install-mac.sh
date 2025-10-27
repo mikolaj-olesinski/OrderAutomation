@@ -35,6 +35,9 @@ fi
 echo "✅ Google Chrome zainstalowany"
 echo ""
 
+# Przejdź do głównego katalogu projektu (jeden poziom wyżej od scripts/)
+cd "$(dirname "$0")/.."
+
 # Utwórz środowisko wirtualne
 echo "Tworzenie środowiska wirtualnego..."
 python3 -m venv venv
@@ -53,5 +56,5 @@ echo "✅ Instalacja zakończona pomyślnie!"
 echo "=========================================="
 echo ""
 echo "Aby uruchomić aplikację, użyj:"
-echo "  ./start.sh"
+echo "  ./scripts/start.sh"
 echo ""
