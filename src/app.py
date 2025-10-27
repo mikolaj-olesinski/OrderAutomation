@@ -18,6 +18,10 @@ logging.basicConfig(
     ]
 )
 
+# Disable Flask's default request logging to reduce log clutter
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
+
 # Fix console encoding for Windows
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')

@@ -64,41 +64,40 @@ class BaseExtractor:
             # Let webdriver-manager download/find the driver
             driver_path = ChromeDriverManager().install()
             
-            # Check if the path points to the actual chromedriver executable
-            if os.path.isfile(driver_path) and os.access(driver_path, os.X_OK):
-                # It's a valid executable file
-                return driver_path
-            
-            # If not, we need to find the actual chromedriver in the directory
+            # Get the base directory where chromedriver should be
             if os.path.isdir(driver_path):
                 search_dir = driver_path
             else:
                 search_dir = os.path.dirname(driver_path)
             
-            # Search for chromedriver executable
-            possible_paths = [
-                os.path.join(search_dir, 'chromedriver'),
-                os.path.join(search_dir, 'chromedriver-mac-arm64', 'chromedriver'),
-                os.path.join(search_dir, 'chromedriver-mac-x64', 'chromedriver'),
-            ]
+            logger.info(f"Searching for chromedriver in: {search_dir}")
             
-            # Also search recursively
+            # Search recursively for the actual chromedriver executable
+            found_paths = []
             for root, dirs, files in os.walk(search_dir):
                 for file in files:
+                    # Look for file named exactly 'chromedriver' (no extension)
                     if file == 'chromedriver':
                         full_path = os.path.join(root, file)
+                        # Check if it's executable
                         if os.access(full_path, os.X_OK):
-                            possible_paths.insert(0, full_path)
+                            found_paths.append(full_path)
+                            logger.info(f"Found executable chromedriver at: {full_path}")
             
-            # Check each possible path
-            for path in possible_paths:
-                if os.path.isfile(path) and os.access(path, os.X_OK):
-                    logger.info(f"Found chromedriver at: {path}")
-                    return path
+            # Return the first valid chromedriver found
+            if found_paths:
+                return found_paths[0]
             
-            # If still not found, return the original path and let it fail with better error
-            logger.warning(f"Could not find executable chromedriver, using: {driver_path}")
-            return driver_path
+            # If no executable found, try the original path from webdriver-manager
+            if os.path.isfile(driver_path) and os.access(driver_path, os.X_OK):
+                logger.info(f"Using webdriver-manager path: {driver_path}")
+                return driver_path
+            
+            # Last resort: raise error with helpful message
+            raise FileNotFoundError(
+                f"Could not find executable chromedriver in {search_dir}. "
+                f"Please ensure Chrome and ChromeDriver are properly installed."
+            )
             
         except Exception as e:
             logger.error(f"Error getting chromedriver path: {e}")
