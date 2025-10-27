@@ -7,11 +7,12 @@
 1. **Otwórz Terminal** (Cmd + Spacja → wpisz "Terminal")
 2. **Przeciągnij folder aplikacji** na okno Terminal i naciśnij Enter
 3. chmod +x scripts/*.sh
-4. **Wpisz:**
+4. rm -rf ~/.wdm/drivers/chromedriver
+5. **Wpisz:**
    ```bash
    chmod +x create-app.sh && ./create-app.sh
    ```
-5. **Gotowe!** Teraz masz aplikację **"Order Automation Manager.app"**
+6. **Gotowe!** Teraz masz aplikację **"Order Automation Manager.app"**
 
 ### Jak używać aplikacji?
 
