@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import logging
 import os
-import glob
+import stat
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,60 @@ class BaseExtractor:
         logger.warning(f"Could not detect Chrome host, defaulting to 127.0.0.1")
         return '127.0.0.1'
     
+    def _is_valid_chromedriver(self, filepath):
+        """
+        Check if file is a valid chromedriver executable
+        
+        Args:
+            filepath: Path to file to check
+            
+        Returns:
+            bool: True if valid chromedriver executable
+        """
+        # Get just the filename
+        filename = os.path.basename(filepath)
+        
+        # Must be exactly named 'chromedriver' (no extension, no prefix)
+        if filename != 'chromedriver':
+            return False
+        
+        # Path must NOT contain these strings (they're documentation files)
+        excluded_keywords = ['LICENSE', 'NOTICE', 'README', 'THIRD_PARTY']
+        if any(keyword in filepath.upper() for keyword in excluded_keywords):
+            logger.debug(f"Skipping documentation file: {filepath}")
+            return False
+        
+        # Must exist
+        if not os.path.isfile(filepath):
+            return False
+        
+        # Must be executable
+        if not os.access(filepath, os.X_OK):
+            logger.debug(f"File not executable: {filepath}")
+            return False
+        
+        # Extra check: should have executable bit set in stat
+        try:
+            st = os.stat(filepath)
+            is_executable = bool(st.st_mode & stat.S_IXUSR)
+            if not is_executable:
+                logger.debug(f"No execute permission: {filepath}")
+                return False
+        except:
+            pass
+        
+        # Try to check file size - chromedriver should be > 1MB
+        try:
+            size = os.path.getsize(filepath)
+            if size < 1_000_000:  # Less than 1MB
+                logger.debug(f"File too small to be chromedriver ({size} bytes): {filepath}")
+                return False
+        except:
+            pass
+        
+        logger.info(f"✓ Valid chromedriver found: {filepath}")
+        return True
+    
     def _get_chromedriver_path(self):
         """Get the correct chromedriver executable path, fixing webdriver-manager issues"""
         try:
@@ -76,27 +130,22 @@ class BaseExtractor:
             found_paths = []
             for root, dirs, files in os.walk(search_dir):
                 for file in files:
-                    # Look for file named exactly 'chromedriver' (no extension)
+                    # Only check files named exactly 'chromedriver'
                     if file == 'chromedriver':
                         full_path = os.path.join(root, file)
-                        # Check if it's executable
-                        if os.access(full_path, os.X_OK):
+                        if self._is_valid_chromedriver(full_path):
                             found_paths.append(full_path)
-                            logger.info(f"Found executable chromedriver at: {full_path}")
             
             # Return the first valid chromedriver found
             if found_paths:
+                logger.info(f"Using chromedriver: {found_paths[0]}")
                 return found_paths[0]
             
-            # If no executable found, try the original path from webdriver-manager
-            if os.path.isfile(driver_path) and os.access(driver_path, os.X_OK):
-                logger.info(f"Using webdriver-manager path: {driver_path}")
-                return driver_path
-            
-            # Last resort: raise error with helpful message
+            # If no valid chromedriver found, raise clear error
             raise FileNotFoundError(
-                f"Could not find executable chromedriver in {search_dir}. "
-                f"Please ensure Chrome and ChromeDriver are properly installed."
+                f"Could not find valid chromedriver executable in {search_dir}.\n"
+                f"Please delete the cache and try again:\n"
+                f"  rm -rf ~/.wdm/drivers/chromedriver"
             )
             
         except Exception as e:
