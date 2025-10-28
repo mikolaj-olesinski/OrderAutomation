@@ -133,6 +133,12 @@ class BaseExtractor:
                     # Only check files named exactly 'chromedriver'
                     if file == 'chromedriver':
                         full_path = os.path.join(root, file)
+                        
+                        # Fix permissions if needed
+                        if not os.access(full_path, os.X_OK):
+                            logger.info(f"Setting executable permission for: {full_path}")
+                            os.chmod(full_path, os.stat(full_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                        
                         if self._is_valid_chromedriver(full_path):
                             found_paths.append(full_path)
             
@@ -151,7 +157,7 @@ class BaseExtractor:
         except Exception as e:
             logger.error(f"Error getting chromedriver path: {e}")
             raise
-    
+        
     def connect_to_chrome(self):
         """Connect to existing Chrome instance via remote debugging"""
         try:
