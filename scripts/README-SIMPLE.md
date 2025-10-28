@@ -7,12 +7,20 @@
 1. **Otwórz Terminal** (Cmd + Spacja → wpisz "Terminal")
 2. **Przeciągnij folder aplikacji** na okno Terminal i naciśnij Enter
 3. chmod +x scripts/*.sh
+
+{
+  "chrome_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "chrome_user_data_dir": "/Users/mikolajolesinski/chrome-debug-profile",
+  ...
+}
+
 4. rm -rf ~/.wdm/drivers/chromedriver
 5. **Wpisz:**
    ```bash
    chmod +x create-app.sh && ./create-app.sh
    ```
 6. **Gotowe!** Teraz masz aplikację **"Order Automation Manager.app"**
+
 
 ### Jak używać aplikacji?
 
