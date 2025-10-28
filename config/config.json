@@ -1,7 +1,7 @@
 {
   "chrome_debug_port": 9222,
   "chrome_path": "",
-  "chrome_user_data_dir": "C:/Users/mikol/AppData/Local/Google/Chrome/User Data/Profile Debug",
+  "chrome_user_data_dir": "",
   "baselinker_url": "https://panel-g.baselinker.com/orders.php#status:26890",
   "b2b_hendi_url": "https://b2b.hendi.com/",
   "baselinker_keywords": ["baselinker", "base", "linker"],
