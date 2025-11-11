@@ -289,7 +289,7 @@ class B2BExtractor(BaseExtractor):
         try:
             modal_selector = self.selectors.get('address_modal', '.jsAddAddressModal')
             save_button_selector = self.selectors.get('save_address_button',
-                'button[type="submit"][form="user-address-form"]')
+                'button.jsUserAddressModalSaveBtn')
             form_fields = self.selectors.get('address_form_fields', {})
             
             form_submit_delay = self.timing.get('form_submit_delay', 2)
@@ -341,6 +341,8 @@ class B2BExtractor(BaseExtractor):
             default_building = self.data_processing.get('default_building_number', '.')
             
             fill_input('name', address_data.get('name', ''))
+
+            
             fill_input('phone', address_data.get('phone', ''))
             fill_input('email', address_data.get('email', ''))
             fill_input('street', address_data.get('street', ''))

@@ -30,7 +30,8 @@ class OrderCoordinator:
             "payment_amount": None,
             "phone": None,
             "email": None,
-            "address": None
+            "address": None,
+            "fullname": None 
         }
         
         try:
@@ -57,6 +58,7 @@ class OrderCoordinator:
             order_data["phone"] = baselinker_data.get("phone")
             order_data["email"] = baselinker_data.get("email")
             order_data["address"] = baselinker_data.get("address")
+            order_data["fullname"] = baselinker_data.get("address", {}).get("name", "") 
             
             order_data["success"] = True
             logger.info("Order data extraction completed successfully")

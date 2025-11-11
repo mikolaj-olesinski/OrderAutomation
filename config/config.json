@@ -1,7 +1,7 @@
 {
   "chrome_debug_port": 9222,
-  "chrome_path": "",
-  "chrome_user_data_dir": "",
+  "chrome_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "chrome_user_data_dir": "/Users/mikolajolesinski/chrome-debug-profile",
   "baselinker_url": "https://panel-g.baselinker.com/orders.php#status:26890",
   "b2b_hendi_url": "https://b2b.hendi.com/",
   "baselinker_keywords": ["baselinker", "base", "linker"],
@@ -44,7 +44,7 @@
     "checkout_button": "button.jsCheckoutButton[type=\"submit\"]",
     "new_address_checkbox": "new_delivery_address",
     "address_modal": ".jsAddAddressModal",
-    "save_address_button": "button[type=\"submit\"][form=\"user-address-form\"]",
+    "save_address_button": "button.jsUserAddressModalSaveBtn",
     "address_form_fields": {
       "name": "address_data[name]",
       "phone": "address_data[phone]",

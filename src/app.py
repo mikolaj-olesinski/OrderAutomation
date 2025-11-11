@@ -212,7 +212,7 @@ def complete_order():
         # Get data from request
         data = request.json
         products = data.get('products', [])
-        address = data.get('address', {})
+        address = data.get('address', {})  # <-- To musi być PRZED combined_name
         payment_amount = data.get('payment_amount', None)
         
         if not products:
@@ -228,8 +228,13 @@ def complete_order():
             }), 400
         
         # Prepare address data for B2B format
+        # Combine fullname + company for the name field
+        fullname = address.get('name', '')  # 'Mateusz Szreder'
+        company = address.get('company', '')  # 'MER SERVICE Piotrowicz, Szreder Sp.J.'
+        combined_name = f"{fullname} {company}".strip() if fullname else company
+        
         address_data = {
-            'name': address.get('company', ''),
+            'name': combined_name,
             'phone': address.get('phone', ''),
             'email': data.get('email', ''),
             'street': address.get('address', ''),
@@ -257,6 +262,9 @@ def complete_order():
             "success": False,
             "error": str(e)
         }), 500
+    
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

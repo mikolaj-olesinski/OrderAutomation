@@ -972,6 +972,7 @@
 
                 const products = extractResult.products || [];
                 const address = {
+                    name: extractResult.address?.name || '',
                     company: extractResult.address?.company || '',
                     phone: extractResult.phone || '',
                     address: extractResult.address?.address || '',

@@ -104,7 +104,6 @@ class BaseLinkerExtractor(BaseExtractor):
             if total_match:
                 total_amount = float(total_match.group(1).replace(',', '.'))
                 logger.info(f"Total order amount: {total_amount} PLN")
-                
                 # Check if fully paid
                 if paid_amount >= total_amount and paid_amount > 0:
                     logger.info(f"Order fully paid ({paid_amount} PLN) - returning paid amount")
